@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>MarketingOps Agent</title>
+<style>
+  :root { --bg:#0f1115; --card:#1a1d24; --accent:#4f8cff; --text:#e6e8ec; --muted:#9aa0aa; --ok:#3ecf8e; --warn:#f0a500; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:12px 14px; background:var(--card); border-bottom:1px solid #262a33; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0; }
+  #status { font-size:11px; color:var(--muted); }
+  select, input, button, textarea { font-family:inherit; }
+  select { background:#0f1115; color:var(--text); border:1px solid #2a2f3a; border-radius:8px; padding:6px; font-size:13px; }
+  .tabs { display:flex; gap:6px; }
+  .tabs button { background:#222631; color:var(--text); border:1px solid #2a2f3a; padding:6px 9px; border-radius:8px; font-size:12px; }
+  .tabs button.active { background:var(--accent); border-color:var(--accent); }
+  main { padding:12px 14px; max-width:860px; margin:0 auto; }
+  .view { display:none; }
+  .view.active { display:block; }
+  #log { display:flex; flex-direction:column; gap:10px; }
+  .msg { white-space:pre-wrap; padding:11px 13px; border-radius:12px; line-height:1.5; font-size:14px; word-break:break-word; }
+  .user { background:var(--accent); color:#fff; align-self:flex-end; max-width:88%; }
+  .bot { background:var(--card); align-self:flex-start; max-width:96%; border:1px solid #262a33; }
+  .bot pre { white-space:pre-wrap; margin:0; }
+  form#f { position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid #262a33; padding:9px 12px; display:flex; gap:8px; }
+  #i { flex:1; background:#0f1115; border:1px solid #2a2f3a; color:var(--text); border-radius:10px; padding:11px; font-size:15px; }
+  button.send { background:var(--accent); border:0; color:#fff; padding:0 16px; border-radius:10px; font-weight:600; }
+  .sug { display:flex; flex-wrap:wrap; gap:7px; margin:6px 0 70px; }
+  .sug button { background:#222631; color:var(--text); padding:7px 11px; border-radius:18px; font-size:12px; border:1px solid #2a2f3a; }
+  .card { background:var(--card); border:1px solid #262a33; border-radius:10px; padding:11px 13px; margin-bottom:9px; }
+  .card .meta { font-size:11px; color:var(--muted); margin-bottom:6px; }
+  .card .body { white-space:pre-wrap; font-size:13px; max-height:260px; overflow:auto; }
+  .card .acts { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+  .card .acts button { font-size:12px; padding:5px 9px; border-radius:7px; border:1px solid #2a2f3a; background:#222631; color:var(--text); }
+  .badge { font-size:10px; padding:2px 7px; border-radius:10px; background:#2a2f3a; color:var(--muted); }
+  .badge.ready { background:#13351f; color:var(--ok); }
+  .badge.due { background:#3a2a00; color:var(--warn); }
+  #overlay { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center; z-index:50; }
+  #overlay .box { background:var(--card); padding:22px; border-radius:12px; width:300px; }
+  #overlay input { width:100%; margin:8px 0 12px; padding:11px; border-radius:9px; border:1px solid #2a2f3a; background:#0f1115; color:var(--text); }
+  #overlay button { width:100%; padding:11px; border:0; border-radius:9px; background:var(--accent); color:#fff; font-weight:600; }
+  .row { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+  .row input { flex:1; min-width:100px; padding:9px; border-radius:8px; border:1px solid #2a2f3a; background:#0f1115; color:var(--text); }
+  .row button { padding:9px 13px; border:0; border-radius:8px; background:var(--accent); color:#fff; }
+  .sectionTitle { font-size:13px; color:var(--muted); margin:14px 0 7px; text-transform:uppercase; letter-spacing:.5px; }
+</style>
+</head>
+<body>
+<div id="overlay" style="display:none">
+  <div class="box">
+    <h2 style="margin:0 0 4px;font-size:17px">🔒 Login</h2>
+    <div id="overlayMsg" style="font-size:12px;color:var(--muted)">Enter the web password.</div>
+    <input id="pw" type="password" placeholder="password" autocomplete="off" />
+    <button id="loginBtn">Unlock</button>
+  </div>
+</div>
+
+<header>
+  <h1>🤖 MarketingOps</h1>
+  <span id="status">loading…</span>
+  <span style="flex:1"></span>
+  <select id="profileSel"><option value="">profile…</option></select>
+  <div class="tabs">
+    <button data-v="chat" class="active">Chat</button>
+    <button data-v="drafts">Drafts</button>
+    <button data-v="reminders">Remind</button>
+    <button data-v="digest">Digest</button>
+    <button data-v="profiles">Profiles</button>
+  </div>
+</header>
+<div id="banner" style="display:none;background:#3a2a00;color:#f0a500;padding:9px 14px;font-size:13px;line-height:1.4"></div>
+
+<main>
+  <section id="view-chat" class="view active">
+    <div class="card" id="quickBuild">
+      <div class="meta">⚡ One-click full digital marketing</div>
+      <input id="kitGoal" placeholder="Your business / goal (e.g. freelance logo design)" />
+      <div class="row" style="margin-top:8px; margin-bottom:0">
+        <button id="kitBtn" class="send" style="padding:9px 13px">🚀 Full Marketing Kit</button>
+        <span style="font-size:11px;color:var(--muted)">builds 14 drafts: strategy, calendar, posts, blog, emails, ads, SEO, landing page</span>
+      </div>
+      <div class="sug" id="kitSug" style="margin:10px 0 0">
+        <button data-act="blog_post">📝 Blog post</button>
+        <button data-act="email_newsletter">📧 Newsletter</button>
+        <button data-act="email_sequence">📨 Email sequence</button>
+        <button data-act="ad_pack">💡 Ad pack</button>
+        <button data-act="seo_keywords">🌐 SEO keywords</button>
+        <button data-act="landing_page">📄 Landing page</button>
+        <button data-act="social_strategy">📱 Social strategy</button>
+      </div>
+    </div>
+    <div id="log"></div>
+    <div class="sug" id="sug">
+      <button>Write a Fiverr gig for Instagram caption writing</button>
+      <button>Draft an Upwork proposal for a Shopify store build</button>
+      <button>7-day content calendar for a fitness brand</button>
+      <button>Live trend scan for AI marketing 2025</button>
+      <button>Web research: pricing for SEO audits</button>
+      <button>Analyze competitor: DesignPickle</button>
+    </div>
+  </section>
+
+  <section id="view-drafts" class="view">
+    <div id="draftsList"></div>
+  </section>
+
+  <section id="view-reminders" class="view">
+    <div class="sectionTitle">Upwork job feed (read-only)</div>
+    <div class="row">
+      <input id="uwQ" placeholder="e.g. Shopify store build" />
+      <button id="uwBtn">Search</button>
+    </div>
+    <div id="uwResult"></div>
+
+    <div class="sectionTitle">Set a reminder</div>
+    <div class="row">
+      <input id="remId" placeholder="draft id" style="flex:0 0 90px" />
+      <input id="remWhen" placeholder="30m / 2h / 3d / HH:MM" />
+      <input id="remNote" placeholder="note (optional)" />
+      <button id="remBtn">Set</button>
+    </div>
+    <div id="remList"></div>
+  </section>
+
+  <section id="view-profiles" class="view">
+    <div class="row">
+      <input id="pName" placeholder="profile name" />
+      <input id="pNiche" placeholder="niche" />
+      <input id="pVoice" placeholder="brand voice" />
+      <button id="pAdd">Add</button>
+    </div>
+    <div id="profilesList"></div>
+  </section>
+
+  <section id="view-digest" class="view">
+    <div class="row">
+      <button id="digestBtn">Refresh digest</button>
+      <button id="briefBtn">Run brief (save+notify)</button>
+      <button id="icsBtn">Download reminders .ics</button>
+    </div>
+    <div class="sectionTitle">Build a campaign</div>
+    <div class="row">
+      <input id="campGoal" placeholder="goal, e.g. grow my SEO gig" />
+      <button id="campBtn">Run campaign</button>
+    </div>
+    <div id="digestBox" class="card"><div class="body">Loading…</div></div>
+  </section>
+</main>
+
+<form id="f">
+  <input id="i" placeholder="Tell the agent what to do…" autocomplete="off" />
+  <button type="submit" class="send">Send</button>
+</form>
+
+<script>
+const TOKEN = localStorage.getItem('token') || '';
+const log = document.getElementById('log');
+const input = document.getElementById('i');
+const overlay = document.getElementById('overlay');
+
+function api(path, opts={}) {
+  opts.headers = Object.assign({}, opts.headers);
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  return fetch(path, opts).then(r => {
+    if (r.status === 401) { showLogin('Session expired — log in again.'); throw new Error('unauth'); }
+    return r.json();
+  });
+}
+function showLogin(msg){ if(msg) document.getElementById('overlayMsg').textContent = msg; overlay.style.display='flex'; }
+document.getElementById('loginBtn').onclick = () => {
+  const pw = document.getElementById('pw').value;
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+    .then(r=>r.json()).then(j=>{ if(j.token){localStorage.setItem('token',j.token);overlay.style.display='none';init();} else document.getElementById('overlayMsg').textContent='Wrong password.'; })
+    .catch(()=>document.getElementById('overlayMsg').textContent='Login failed.');
+};
+
+function addMsg(text, who){ const d=document.createElement('div'); d.className='msg '+who;
+  if(who==='bot'){const pre=document.createElement('pre');pre.textContent=text;d.appendChild(pre);} else d.textContent=text;
+  log.appendChild(d); window.scrollTo(0,document.body.scrollHeight); }
+function send(text){ if(!text.trim())return; addMsg(text,'user'); input.value='';
+  api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})})
+    .then(j=>addMsg(j.reply||'(no reply)','bot')).catch(e=>{if(e.message!=='unauth')addMsg('Server error: '+e,'bot');}); }
+document.getElementById('f').addEventListener('submit',e=>{e.preventDefault();send(input.value);});
+document.querySelectorAll('.sug button').forEach(b=>b.addEventListener('click',()=>send(b.textContent)));
+
+function switchTo(v){ const t=document.querySelector(`.tabs button[data-v="${v}"]`); if(t) t.click(); }
+document.getElementById('kitBtn').onclick = () => {
+  const goal = document.getElementById('kitGoal').value.trim();
+  if(!goal){ alert('Enter your business or goal first.'); return; }
+  const btn = document.getElementById('kitBtn');
+  btn.disabled = true; btn.textContent = '⏳ Building… (up to ~2 min)';
+  api('/api/full_kit',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({goal, niche:'', channels:'Instagram, TikTok, LinkedIn, X, Facebook'})})
+    .then(j=>{ btn.disabled=false; btn.textContent='🚀 Full Marketing Kit';
+      alert('Full marketing kit created — '+j.ids.filter(x=>typeof x==='number').length+' drafts saved. Open the Drafts tab.');
+      loadDrafts(); switchTo('drafts'); })
+    .catch(e=>{ btn.disabled=false; btn.textContent='🚀 Full Marketing Kit'; if(e.message!=='unauth')alert('Error: '+e); });
+};
+document.querySelectorAll('#kitSug button').forEach(b=>b.addEventListener('click',()=>{
+  const g = document.getElementById('kitGoal').value.trim() || 'my business';
+  const map = {
+    blog_post:`write a long SEO blog post about ${g}`,
+    email_newsletter:`write an email newsletter about ${g}`,
+    email_sequence:`write a 5-email nurture sequence about ${g}`,
+    ad_pack:`create a paid ad pack (Meta, Google, TikTok) for ${g}`,
+    seo_keywords:`build an SEO keyword plan for ${g}`,
+    landing_page:`write a landing page for ${g}`,
+    social_strategy:`build a social media strategy for ${g}`,
+  };
+  send(map[b.dataset.act] || g);
+}));
+
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); document.getElementById('view-'+b.dataset.v).classList.add('active');
+  if(b.dataset.v==='drafts') loadDrafts();
+  if(b.dataset.v==='reminders') loadReminders();
+  if(b.dataset.v==='digest') loadDigest();
+  if(b.dataset.v==='profiles') loadProfiles();
+}));
+
+// profiles
+function loadProfiles(){
+  api('/api/profiles').then(j=>{
+    const sel=document.getElementById('profileSel');
+    sel.innerHTML='<option value="">profile…</option>'+j.profiles.map(p=>`<option ${p===j.active?'selected':''}>${p}</option>`).join('');
+    document.getElementById('profilesList').innerHTML = j.profiles.length
+      ? j.profiles.map(p=>`<div class="card"><div class="meta">${p}${p===j.active?' · ACTIVE':''}</div></div>`).join('')
+      : '<div class="card">No profiles yet. Add one above.</div>';
+  }).catch(()=>{});
+}
+document.getElementById('profileSel').onchange=e=>{ const n=e.target.value; if(!n)return;
+  api('/api/profiles/use',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})}).then(()=>{loadProfiles();status();}); };
+document.getElementById('pAdd').onclick=()=>{ const name=document.getElementById('pName').value.trim(); if(!name)return;
+  api('/api/profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,niche:document.getElementById('pNiche').value,voice:document.getElementById('pVoice').value})})
+    .then(()=>{document.getElementById('pName').value='';document.getElementById('pNiche').value='';document.getElementById('pVoice').value='';loadProfiles();}); };
+
+// drafts
+function loadDrafts(){
+  api('/api/drafts').then(j=>{
+    const el=document.getElementById('draftsList');
+    if(!j.drafts.length){el.innerHTML='<div class="card">No drafts yet. Generate a gig, post, or proposal and it is saved here for your review.</div>';return;}
+    el.innerHTML=j.drafts.map(d=>`
+      <div class="card">
+        <div class="meta">#${d.id} · ${d.kind} · <span class="badge ${d.status==='ready'?'ready':''}">${d.status}</span> · ${d.profile||'no profile'}</div>
+        <div class="body">${escapeHtml(d.title)}\n\n${escapeHtml(d.content)}</div>
+        <div class="acts">
+          <button onclick="copyDraft(${d.id})">Copy</button>
+          <button onclick="exportMd(${d.id})">Export .md</button>
+          <button onclick="approveDraft(${d.id})">Mark ready</button>
+          <button onclick="pushBuffer(${d.id})" ${d.status!=='ready'?'disabled style="opacity:.4"':''}>Push Buffer</button>
+          <button onclick="delDraft(${d.id})">Delete</button>
+        </div>
+      </div>`).join('');
+  }).catch(()=>{});
+}
+function escapeHtml(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function copyDraft(id){ api('/api/drafts/'+id).then(d=>{navigator.clipboard.writeText(d.content);alert('Copied to clipboard.');}); }
+function exportMd(id){ api('/api/drafts/'+id).then(d=>{
+  const md=`# ${d.title}\n\n- **Type:** ${d.kind}\n- **Profile:** ${d.profile||'—'}\n- **Status:** ${d.status}\n- **Created:** ${new Date(d.created*1000).toLocaleString()}\n\n---\n\n${d.content}\n`;
+  const blob=new Blob([md],{type:'text/markdown'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=`draft-${d.id}.md`; a.click(); }); }
+function approveDraft(id){ api('/api/drafts/'+id+'/approve',{method:'POST'}).then(()=>loadDrafts()); }
+function delDraft(id){ api('/api/drafts/'+id,{method:'DELETE'}).then(()=>loadDrafts()); }
+
+// reminders + upwork
+function loadReminders(){
+  api('/api/reminders').then(j=>{
+    const el=document.getElementById('remList');
+    if(!j.reminders.length){el.innerHTML='<div class="card">No reminders set.</div>';return;}
+    el.innerHTML=j.reminders.map(r=>`
+      <div class="card">
+        <div class="meta">#${r.id} · draft ${r.draft_id} · <span class="badge ${r.is_due?'due':''}">${r.is_due?'DUE':'upcoming'}</span> · ${r.due_label}</div>
+        <div class="body">${escapeHtml(r.draft_title)}${r.note?'\n\n'+escapeHtml(r.note):''}</div>
+        <div class="acts"><button onclick="doneRem(${r.id})">Dismiss</button></div>
+      </div>`).join('');
+  }).catch(()=>{});
+}
+function doneRem(id){ api('/api/reminders/'+id+'/done',{method:'POST'}).then(()=>loadReminders()); }
+document.getElementById('remBtn').onclick=()=>{
+  const did=document.getElementById('remId').value.trim();
+  const when=document.getElementById('remWhen').value.trim();
+  const note=document.getElementById('remNote').value.trim();
+  if(!did||!when)return;
+  api('/api/reminders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draft_id:parseInt(did),when,note})})
+    .then(()=>{document.getElementById('remId').value='';document.getElementById('remWhen').value='';document.getElementById('remNote').value='';loadReminders();});
+};
+document.getElementById('uwBtn').onclick=()=>{
+  const q=document.getElementById('uwQ').value.trim(); if(!q)return;
+  api('/api/upwork',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})})
+    .then(j=>{ document.getElementById('uwResult').innerHTML=`<div class="card"><div class="meta">Upwork · saved as draft #${j.draft_id}</div><div class="body">${escapeHtml(j.reply)}</div></div>`; })
+    .catch(e=>{if(e.message!=='unauth')alert('Upwork error: '+e);});
+};
+
+function status(){
+  fetch('/api/status').then(r=>r.json()).then(s=>{
+    document.getElementById('status').textContent=(s.auth_required&&!TOKEN?'🔒 ':'')+(s.llm_ready?`${s.llm_provider} ✓`:`${s.llm_provider} ✗`);
+    const banner=document.getElementById('banner');
+    if(!s.llm_ready){
+      banner.style.display='block';
+      banner.innerHTML='⚠ LLM not ready ('+s.llm_provider+'). The agent can\'t answer until you configure one. Run '+
+        '<code>python cli.py init</code> to add an OpenAI/Anthropic key, OR install Ollama (ollama.com) and run '+
+        '<code>ollama pull llama3.1</code>. Everything else (drafts, reminders, calendar) still works.';
+    } else { banner.style.display='none'; }
+    if(s.auth_required&&!TOKEN) showLogin('Enter the web password.');
+  }).catch(()=>document.getElementById('status').textContent='offline');
+}
+
+// buffer push + digest + ics
+function pushBuffer(id){
+  const pids = prompt('Buffer profile ids (comma-separated, from the Digest tab):');
+  if(!pids) return;
+  const when = prompt('Schedule when? (blank=now, or 30m/2h/3d/HH:MM):','');
+  api('/api/push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draft_id:id,profile_ids:pids,when:when||null})})
+    .then(j=>{ if(j.result&&j.result.error) alert('Push failed: '+j.result.error); else { alert('Pushed to Buffer.'); loadDrafts(); } })
+    .catch(e=>{if(e.message!=='unauth')alert('Push error: '+e);});
+}
+function loadDigest(){
+  api('/api/digest').then(j=>{ document.getElementById('digestBox').innerHTML='<div class="body">'+escapeHtml(j.digest)+'</div>'; }).catch(()=>{});
+}
+document.getElementById('digestBtn').onclick=loadDigest;
+document.getElementById('briefBtn').onclick=()=>{
+  api('/api/brief',{method:'POST'}).then(j=>{ document.getElementById('digestBox').innerHTML='<div class="body">'+escapeHtml(j.digest)+'</div>'; });
+};
+document.getElementById('campBtn').onclick=()=>{
+  const goal=document.getElementById('campGoal').value.trim(); if(!goal)return;
+  api('/api/campaign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal})})
+    .then(j=>{ alert('Campaign drafts created: '+j.ids.join(', ')); loadDrafts(); });
+};
+document.getElementById('icsBtn').onclick=()=>{
+  fetch('/api/reminders/ics',{headers:TOKEN?{'Authorization':'Bearer '+TOKEN}:{}}).then(r=>r.blob()).then(b=>{
+    const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='reminders.ics'; a.click();
+  });
+};
+
+function init(){
+  status();
+  loadProfiles();
+  addMsg('Agent ready. Tap a suggestion or type a command (e.g. "write a Fiverr gig for logo design"). '+
+         'If the yellow banner above is showing, configure an LLM first with: python cli.py init', 'bot');
+}
+init();
+</script>
+</body>
+</html>
